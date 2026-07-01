@@ -99,7 +99,7 @@ pub fn first_of_sequence(symbols: &[Symbol], first_sets: &FirstSets) -> (BTreeSe
     let mut first = BTreeSet::new();
     let mut nullable = true;
 
-    for symbol in symbols {
+    for (index, symbol) in symbols.iter().enumerate() {
         match symbol {
             Symbol::Terminal(value) => {
                 first.insert(value.clone());
@@ -107,7 +107,9 @@ pub fn first_of_sequence(symbols: &[Symbol], first_sets: &FirstSets) -> (BTreeSe
                 break;
             }
             Symbol::NonTerminal(name) => {
-                let nested_first = first_sets.get(name).cloned().unwrap_or_default();
+                let nested_first = first_sets
+                    .get(name)
+                    .unwrap_or_else(|| panic!("missing FIRST set for non-terminal: {name}"));
                 for entry in &nested_first {
                     if entry != "ε" {
                         first.insert(entry.clone());
@@ -119,7 +121,10 @@ pub fn first_of_sequence(symbols: &[Symbol], first_sets: &FirstSets) -> (BTreeSe
                 }
             }
             Symbol::Epsilon => {
-                first.insert("ε".to_string());
+                assert!(
+                    symbols.len() == 1 && index == 0,
+                    "epsilon must appear alone in a sequence"
+                );
                 break;
             }
             Symbol::EndMarker => {
@@ -128,10 +133,6 @@ pub fn first_of_sequence(symbols: &[Symbol], first_sets: &FirstSets) -> (BTreeSe
                 break;
             }
         }
-    }
-
-    if nullable {
-        first.insert("ε".to_string());
     }
 
     (first, nullable)
