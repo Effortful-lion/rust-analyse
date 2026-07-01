@@ -19,6 +19,7 @@ pub struct TableConflict {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseTableError {
     Conflict(TableConflict),
+    MissingFirstSet { non_terminal: String },
     MissingFollowSet { non_terminal: String },
 }
 
@@ -27,6 +28,14 @@ pub fn build_parse_table(
     first_sets: &FirstSets,
     follow_sets: &FollowSets,
 ) -> Result<ParseTable, ParseTableError> {
+    for non_terminal in &grammar.non_terminals {
+        if !first_sets.contains_key(non_terminal) {
+            return Err(ParseTableError::MissingFirstSet {
+                non_terminal: non_terminal.clone(),
+            });
+        }
+    }
+
     let mut table = ParseTable {
         entries: BTreeMap::new(),
     };

@@ -48,10 +48,33 @@ fn build_parse_table_reports_conflict_for_non_ll1_grammar() {
             assert_eq!(conflict.existing_production, 1);
             assert_eq!(conflict.new_production, 2);
         }
+        ParseTableError::MissingFirstSet { non_terminal } => {
+            panic!("unexpected missing first set error for {non_terminal}");
+        }
         ParseTableError::MissingFollowSet { non_terminal } => {
             panic!("unexpected missing follow set error for {non_terminal}");
         }
     }
+}
+
+#[test]
+fn build_parse_table_reports_missing_first_set_explicitly() {
+    let problem = load_problem(Path::new("tests/fixtures/expression_grammar.txt"))
+        .expect("load fixture");
+    let mut first_sets = compute_first_sets(&problem.grammar);
+    let follow_sets = compute_follow_sets(&problem.grammar, &first_sets);
+    first_sets.remove("ExprP");
+
+    let error = build_parse_table(&problem.grammar, &first_sets, &follow_sets)
+        .err()
+        .expect("expected missing first set");
+
+    assert_eq!(
+        error,
+        ParseTableError::MissingFirstSet {
+            non_terminal: "ExprP".to_string()
+        }
+    );
 }
 
 #[test]
