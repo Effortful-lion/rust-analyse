@@ -6,16 +6,15 @@ use crate::grammar::{Grammar, ProblemInput, Production, Symbol};
 
 pub fn load_problem(path: &Path) -> Result<ProblemInput, String> {
     let raw = fs::read_to_string(path).map_err(|error| format!("读取文件失败: {error}"))?;
-    let sections: Vec<&str> = raw.split("\n%%\n").collect();
-    if sections.len() != 3 {
-        return Err("输入文件必须使用 \\n%%\\n 分成三段".to_string());
-    }
+    let sections = split_sections(&raw)?;
 
-    let (start_symbol, terminals) = parse_header(sections[0])?;
-    let grammar_lines = collect_non_empty_lines(sections[1]);
-    let raw_inputs = collect_non_empty_lines(sections[2]);
+    let header_lines = collect_non_empty_lines(&sections[0]);
+    let grammar_lines = collect_non_empty_lines(&sections[1]);
+    let raw_inputs = collect_non_empty_lines(&sections[2]);
 
+    let (start_symbol, terminals) = parse_header(&header_lines)?;
     let non_terminals = collect_non_terminals(&grammar_lines)?;
+    validate_symbol_sets(&terminals, &non_terminals)?;
     if !non_terminals.contains(&start_symbol) {
         return Err(format!("开始符号未出现在产生式左部: {start_symbol}"));
     }
@@ -39,11 +38,11 @@ pub fn load_problem(path: &Path) -> Result<ProblemInput, String> {
     })
 }
 
-fn parse_header(section: &str) -> Result<(String, BTreeSet<String>), String> {
+fn parse_header(lines: &[&str]) -> Result<(String, BTreeSet<String>), String> {
     let mut start_symbol = None;
     let mut terminals = BTreeSet::new();
 
-    for line in collect_non_empty_lines(section) {
+    for line in lines {
         if let Some(rest) = line.strip_prefix("%start ") {
             let value = rest.trim();
             if value.is_empty() {
@@ -67,6 +66,28 @@ fn parse_header(section: &str) -> Result<(String, BTreeSet<String>), String> {
     Ok((start_symbol, terminals))
 }
 
+fn split_sections(raw: &str) -> Result<Vec<Vec<&str>>, String> {
+    let mut sections = vec![Vec::new()];
+
+    for line in raw.lines() {
+        if line.trim() == "%%" {
+            sections.push(Vec::new());
+            continue;
+        }
+
+        sections
+            .last_mut()
+            .expect("sections always has at least one entry")
+            .push(line);
+    }
+
+    if sections.len() != 3 {
+        return Err("输入文件必须包含两个 %% 分隔段".to_string());
+    }
+
+    Ok(sections)
+}
+
 fn collect_non_terminals(lines: &[&str]) -> Result<BTreeSet<String>, String> {
     let mut non_terminals = BTreeSet::new();
 
@@ -76,6 +97,25 @@ fn collect_non_terminals(lines: &[&str]) -> Result<BTreeSet<String>, String> {
     }
 
     Ok(non_terminals)
+}
+
+fn validate_symbol_sets(
+    terminals: &BTreeSet<String>,
+    non_terminals: &BTreeSet<String>,
+) -> Result<(), String> {
+    let overlaps = terminals
+        .intersection(non_terminals)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    if overlaps.is_empty() {
+        return Ok(());
+    }
+
+    Err(format!(
+        "terminal 与 non-terminal 不能重名: {}",
+        overlaps.join(", ")
+    ))
 }
 
 fn build_productions(
@@ -163,9 +203,10 @@ fn parse_right_side(
     Ok(symbols)
 }
 
-fn collect_non_empty_lines(section: &str) -> Vec<&str> {
-    section
-        .lines()
+fn collect_non_empty_lines<'a>(lines: &'a [&'a str]) -> Vec<&'a str> {
+    lines
+        .iter()
+        .copied()
         .map(str::trim)
         .filter(|line| !line.is_empty())
         .collect()
