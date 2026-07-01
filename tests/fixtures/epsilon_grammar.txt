@@ -1,0 +1,7 @@
+%start S
+%token a
+%%
+S -> A
+A -> a A | ε
+%%
+a a

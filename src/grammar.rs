@@ -29,3 +29,20 @@ pub struct ProblemInput {
     pub grammar: Grammar,
     pub inputs: Vec<Vec<String>>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseStep {
+    pub step: usize,
+    pub stack: String,
+    pub remaining_input: String,
+    pub action: String,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseResult {
+    pub input: Vec<String>,
+    pub accepted: bool,
+    pub steps: Vec<ParseStep>,
+    pub error_message: Option<String>,
+}
